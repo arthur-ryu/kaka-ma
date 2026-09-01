@@ -35,5 +35,5 @@ app.post('/api/update', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`🚀 서버 구동 완료 (포트: ${PORT})`);
+    console.log(`Server is running on (port: ${PORT})`);
 });
