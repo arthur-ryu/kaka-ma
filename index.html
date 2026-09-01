@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>카톡 매크로 원격 제어판</title>
+    <style>
+        body { font-family: sans-serif; max-width: 600px; margin: 20px auto; padding: 20px; background: #f5f5f5; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        textarea { width: 100%; height: 160px; margin-top: 5px; box-sizing: border-box; padding: 10px; font-size: 14px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 5px; }
+        input[type="text"], input[type="number"] { width: 100%; padding: 8px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; font-weight: bold; cursor: pointer; border: none; border-radius: 4px; margin-top: 10px; }
+        .btn-save { background: #2196F3; color: white; }
+        .btn-group { display: flex; gap: 10px; }
+        .btn-start { background: #4CAF50; color: white; flex: 1; }
+        .btn-stop { background: #f44336; color: white; flex: 1; }
+        #status { text-align: center; margin-top: 15px; font-weight: bold; padding: 10px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>카톡 매크로 원격 제어판</h2>
+    
+    <label><b>홍보 문구 (줄바꿈 자동 적용):</b></label>
+    <textarea id="message" placeholder="홍보 문구를 입력하세요.."></textarea>
+
+    <div style="margin-top: 15px;">
+        <label><b>반복 발송 주기 (분 단위):</b></label>
+        <input type="number" id="delayMinutes" value="22" min="1" placeholder="예: 22">
+    </div>
+
+    <label style="margin-top: 15px; display: block;"><b>방 ID 목록 (최대 8개):</b></label>
+    <div class="grid" id="room-inputs"></div>
+
+    <button class="btn-save" onclick="updateData(null)">설정만 저장</button>
+
+    <div class="btn-group">
+        <button class="btn-start" onclick="updateData('START')">▶ 매크로 시작</button>
+        <button class="btn-stop" onclick="updateData('STOP')">⏹ 매크로 종료</button>
+    </div>
+
+    <div id="status">상태 불러오는 중...</div>
+</div>
+
+<script>
+    const container = document.getElementById('room-inputs');
+    for (let i = 1; i <= 8; i++) {
+        container.innerHTML += `<input type="text" id="room${i}" placeholder="방 ID ${i}">`;
+    }
+
+    async function loadData() {
+        try {
+            let res = await fetch('/api/data');
+            let data = await res.json();
+            if (data.message) document.getElementById('message').value = data.message;
+            if (data.delayMinutes) document.getElementById('delayMinutes').value = data.delayMinutes;
+            if (data.targetIds) {
+                for (let i = 0; i < 8; i++) {
+                    document.getElementById(`room${i+1}`).value = data.targetIds[i] || "";
+                }
+            }
+            updateStatusText(data.status);
+        } catch(e) { console.error("로드 실패:", e); }
+    }
+
+    function updateStatusText(status) {
+        const statusDiv = document.getElementById('status');
+        if (status === 'START') {
+            statusDiv.style.background = '#e8f5e9'; statusDiv.style.color = '#2e7d32';
+            statusDiv.innerText = "🟢 현재 상태: 매크로 작동 중 (START)";
+        } else {
+            statusDiv.style.background = '#ffebee'; statusDiv.style.color = '#c62828';
+            statusDiv.innerText = "🔴 현재 상태: 매크로 종료됨 (STOP)";
+        }
+    }
+
+    async function updateData(newStatus) {
+        let msg = document.getElementById('message').value;
+        let delayMinutes = document.getElementById('delayMinutes').value;
+        let ids = [];
+        for (let i = 1; i <= 8; i++) {
+            let val = document.getElementById(`room${i}`).value.trim();
+            if (val) ids.push(val);
+        }
+
+        let payload = { message: msg, delayMinutes: delayMinutes, targetIds: ids };
+        if (newStatus) payload.status = newStatus;
+
+        let res = await fetch('/api/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        let result = await res.json();
+        if (result.result === 'success') {
+            updateStatusText(result.data.status);
+            alert(newStatus ? `✅ [${newStatus}] 명령을 발송했습니다.` : "✅ 설정 저장 완료");
+        }
+    }
+
+    window.onload = loadData;
+</script>
+
+</body>
+</html>
